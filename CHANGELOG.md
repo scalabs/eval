@@ -1,0 +1,30 @@
+## 1.0.0
+
+- Initial public release of eval library
+- **Core Features:**
+  - Intuitive `expect()` and `expectAsync()` API integrated with Dart's test framework
+  - Comprehensive string matchers (patterns, word count, case-insensitive matching)
+  - JSON validation matchers (structure, paths, values)
+  - Schema validation with JSON Schema support
+  - YAML frontmatter parsing and validation for markdown files
+  - String distance metrics (Levenshtein, Jaro-Winkler)
+- **LLM-as-Judge:**
+  - Semantic similarity evaluation
+  - Question answering validation
+  - Faithfulness checking (hallucination detection)
+  - Toxicity and bias detection
+- **RAG Evaluation Suite:**
+  - Context precision and recall metrics
+  - Answer groundedness (hallucination detection)
+  - Answer relevancy and correctness
+  - Combined RAG scoring with customizable weights
+- **Statistical Analysis:**
+  - Mean, standard deviation, and percentile calculations
+  - Aggregate statistics across multiple test runs
+  - Model-based grouping and comparison
+- **A/B Testing:**
+  - `evalCompare()` for comparing prompt variants
+  - Statistical significance testing using Welch's t-test
+  - Multi-model and multi-run evaluation support
+- Flexible `APICallService` interface for any LLM provider
+- Example Claude API service implementation included

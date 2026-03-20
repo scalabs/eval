@@ -1,0 +1,27 @@
+name: eval
+description: An LLM evaluation library for Dart. Test AI outputs with flexible matchers, LLM-as-judge, RAG metrics, and statistical analysis.
+version: 1.0.0
+
+repository: https://github.com/biralo-studio/eval
+homepage: https://biralo.studio
+issue_tracker: https://github.com/biralo-studio/eval/issues
+
+topics:
+  - llm
+  - evaluation
+  - testing
+  - ai
+  - rag
+  - machine-learning
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  http: ^1.6.0
+  matcher: ^0.12.0
+  test: ^1.28.0
+  yaml: ^3.1.3
+
+dev_dependencies:
+  lints: ^6.0.0
