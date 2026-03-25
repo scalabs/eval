@@ -2,9 +2,9 @@ name: eval
 description: An LLM evaluation library for Dart. Test AI outputs with flexible matchers, LLM-as-judge, RAG metrics, and statistical analysis.
 version: 1.0.0
 
-repository: https://github.com/biralo-studio/eval
+repository: https://github.com/scalabs/eval
 homepage: https://biralo.studio
-issue_tracker: https://github.com/biralo-studio/eval/issues
+issue_tracker: https://github.com/scalabs/eval/issues
 
 topics:
   - llm
