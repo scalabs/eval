@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:eval/eval.dart';
 import 'package:eval/src/services/openrouter.dart';
@@ -13,27 +12,17 @@ void main() {
         systemPrompt:
             'Your job is to only produce a JSON object. No other description or explanation or anything. And no ```json or ``` blocks. Just the pure JSON object.',
       );
-      // Extract JSON from response if it contains extra text
-      final jsonRegex = RegExp(r'\{[^{}]*\}');
-      final match = jsonRegex.firstMatch(resp);
-      if (match == null) {
-        throw FormatException('No JSON object found in response: $resp');
-      }
-      final jsonStr = match.group(0)!;
-      final json = jsonDecode(jsonStr);
-      print(json);
-      expect(json, isA<Map<String, dynamic>>());
-      expect(json['message'], 'Hello, World!');
+
+      expect(resp, isValidJson);
+      expect(resp, isJsonObject);
+      expect(resp, hasJsonPathValue('message', 'Hello, World!'));
     },
     apiServices: [
-      OpenrouterService(
-        defaultModel: OpenrouterModel.haiku45,
-        apiKey: apiKey,
-      ),
-      /* OpenrouterService(
-        defaultModel: OpenrouterModel.zai,
-        apiKey: apiKey,
-      ), */
+      OpenrouterService(defaultModel: OpenrouterModel.grok, apiKey: apiKey),
+      OpenrouterService(defaultModel: OpenrouterModel.nemotron, apiKey: apiKey),
+      OpenrouterService(defaultModel: OpenrouterModel.minimax, apiKey: apiKey),
+      OpenrouterService(defaultModel: OpenrouterModel.qwen3, apiKey: apiKey),
+      OpenrouterService(defaultModel: OpenrouterModel.openai, apiKey: apiKey),
     ],
     numberOfRunsPerLLM: 3,
     verbose: true,

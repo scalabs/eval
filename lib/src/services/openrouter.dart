@@ -8,6 +8,9 @@ enum OpenrouterModel {
   haiku45('anthropic/claude-haiku-4.5'),
   zai('z-ai/glm-4.5-20240919'),
   grok('x-ai/grok-4.20-multi-agent-beta'),
+  nemotron('nvidia/nemotron-3-super-120b-a12b:free'),
+  minimax('minimax/minimax-m2.5:free'),
+  qwen3('qwen/qwen3-embedding-4b'),
   openai('openai/gpt-4.1');
   
   final String modelId;
@@ -87,7 +90,10 @@ class OpenrouterService extends APICallService<OpenrouterModel> {
 
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
-      return jsonResponse['choices'][0]['message']['content'];
+      final rawContent = jsonResponse['choices'][0]['message']['content'] as String;
+      return _stripMarkdown(rawContent);
+
+      //return jsonResponse['choices'][0]['message']['content'];
     } else if (response.statusCode == 429) {
       throw RateLimitException('Claude API rate limit hit: ${response.body}');
     } else if (response.statusCode == 529) {
@@ -97,5 +103,15 @@ class OpenrouterService extends APICallService<OpenrouterModel> {
         'Request failed with status: ${response.statusCode} ${response.body}',
       );
     }
+  }
+
+  String _stripMarkdown(String text) {
+    final exp = RegExp(r'```(?:json)?\s*([\s\S]*?)\s*```', caseSensitive: false);
+    final match = exp.firstMatch(text);
+  
+    if (match != null) {
+      return match.group(1)!.trim();
+    }
+    return text.trim();
   }
 }
