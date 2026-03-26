@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
-
 import 'package:eval/eval.dart';
+import 'package:eval/src/services/openrouter.dart';
 
 void main() {
-  final apiKey = Platform.environment['ANTHROPIC_API_KEY'] ?? '';
+  final apiKey = Platform.environment['OPENROUTER_API_KEY'] ?? '';
   eval(
     'JSON Generation Test',
     (apiService) async {
@@ -13,20 +12,17 @@ void main() {
         systemPrompt:
             'Your job is to only produce a JSON object. No other description or explanation or anything. And no ```json or ``` blocks. Just the pure JSON object.',
       );
-      final json = jsonDecode(resp);
-      print(json);
-      expect(json, isA<Map<String, dynamic>>());
-      expect(json['message'], 'Hello, World!');
+
+      expect(resp, isValidJson);
+      expect(resp, isJsonObject);
+      expect(resp, hasJsonPathValue('message', 'Hello, World!'));
     },
     apiServices: [
-      ExampleClaudeService(
-        defaultModel: ExampleClaudeModel.haiku45,
-        apiKey: apiKey,
-      ),
-      ExampleClaudeService(
-        defaultModel: ExampleClaudeModel.sonnet45,
-        apiKey: apiKey,
-      ),
+      OpenrouterService(defaultModel: OpenrouterModel.grok, apiKey: apiKey),
+      OpenrouterService(defaultModel: OpenrouterModel.nemotron, apiKey: apiKey),
+      OpenrouterService(defaultModel: OpenrouterModel.minimax, apiKey: apiKey),
+      OpenrouterService(defaultModel: OpenrouterModel.qwen3, apiKey: apiKey),
+      OpenrouterService(defaultModel: OpenrouterModel.openai, apiKey: apiKey),
     ],
     numberOfRunsPerLLM: 3,
     verbose: true,
