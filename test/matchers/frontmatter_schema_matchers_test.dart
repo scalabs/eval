@@ -487,8 +487,11 @@ Body.
       );
     });
 
-    test('matches missing key when null is allowed', () {
-      expect(validMarkdown, frontmatterFieldOneOf('missing', ['a', 'b', null]));
+    test('does not match missing key when null is allowed', () {
+      expect(
+        validMarkdown,
+        isNot(frontmatterFieldOneOf('missing', ['a', 'b', null])),
+      );
     });
 
     test('matches different value types', () {

@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:eval/eval.dart';
 
-void main() {
+Future<void> main() async {
   final apiKey = Platform.environment['ANTHROPIC_API_KEY'] ?? '';
-  eval(
+  await eval(
     'JSON Generation Test',
     (apiService) async {
       final resp = await apiService.sendRequest(

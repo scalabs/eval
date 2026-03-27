@@ -80,18 +80,11 @@ class _ParseFailed {
 /// Attempts to parse frontmatter, returns _parseFailed on failure.
 Object _tryParse(Object? item) {
   if (item is! String) return _parseFailed;
-  if (!item.startsWith('---\n')) return _parseFailed;
-
-  try {
-    final result = parseMarkdownBody(item);
-    // Check if parsing actually succeeded (frontmatter was found)
-    if (result.frontmatter.isEmpty && !item.contains('\n---')) {
-      return _parseFailed;
-    }
-    return result;
-  } catch (_) {
+  final result = inspectMarkdownBody(item);
+  if (!result.hasFrontmatter || !result.isValidFrontmatter) {
     return _parseFailed;
   }
+  return result;
 }
 
 class _FrontmatterMatchesSchema extends Matcher {
@@ -112,7 +105,7 @@ class _FrontmatterMatchesSchema extends Matcher {
       return false;
     }
 
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     final errors = <String>[];
     _validateSchema(parsed.frontmatter, schema, '', errors);
 
@@ -318,7 +311,7 @@ class _FrontmatterHasRequiredFields extends Matcher {
       return false;
     }
 
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     final frontmatter = parsed.frontmatter;
 
     final errors = <String>[];
@@ -359,8 +352,8 @@ class _FrontmatterHasRequiredFields extends Matcher {
 
   @override
   Description describe(Description description) => description.add(
-        'frontmatter has required fields: ${fields.keys.join(', ')}',
-      );
+    'frontmatter has required fields: ${fields.keys.join(', ')}',
+  );
 
   @override
   Description describeMismatch(
@@ -400,7 +393,7 @@ class _FrontmatterArrayLengthBetween extends Matcher {
       return false;
     }
 
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     if (!parsed.frontmatter.containsKey(key)) {
       matchState['error'] = 'Key "$key" not found in frontmatter';
       return false;
@@ -422,8 +415,8 @@ class _FrontmatterArrayLengthBetween extends Matcher {
 
   @override
   Description describe(Description description) => description.add(
-        'frontmatter array "$key" has length between $min and $max',
-      );
+    'frontmatter array "$key" has length between $min and $max',
+  );
 
   @override
   Description describeMismatch(
@@ -461,11 +454,8 @@ class _FrontmatterFieldOneOf extends Matcher {
       return false;
     }
 
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     if (!parsed.frontmatter.containsKey(key)) {
-      if (allowedValues.contains(null)) {
-        return true; // null is allowed and key is missing
-      }
       matchState['error'] = 'Key "$key" not found in frontmatter';
       return false;
     }
@@ -518,7 +508,7 @@ class _FrontmatterFieldHasType extends Matcher {
       return false;
     }
 
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     if (!parsed.frontmatter.containsKey(key)) {
       matchState['error'] = 'Key "$key" not found in frontmatter';
       return false;

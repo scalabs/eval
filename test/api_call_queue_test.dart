@@ -193,6 +193,25 @@ void main() {
         );
       });
 
+      test('should continue processing after a failed callback', () async {
+        await queue.registerCallQueue<TestServiceType>();
+
+        await expectLater(
+          queue.addCallByType<TestServiceType>(
+            () async => throw Exception('first failure'),
+            Duration.zero,
+          ),
+          throwsA(isA<Exception>()),
+        );
+
+        final result = await queue.addCallByType<TestServiceType>(
+          () async => 'second result',
+          Duration.zero,
+        );
+
+        expect(result, equals('second result'));
+      });
+
       test('should respect timing between sequential calls', () async {
         await queue.registerCallQueue<TestServiceType>();
 

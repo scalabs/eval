@@ -43,8 +43,10 @@ class CompareResult {
     buffer.writeln('=== Comparative Eval Results ===\n');
 
     // Table header
-    final models =
-        byVariantAndModel.values.expand((m) => m.keys).toSet().toList();
+    final models = byVariantAndModel.values
+        .expand((m) => m.keys)
+        .toSet()
+        .toList();
     final colWidth = 18;
 
     buffer.write('Variant'.padRight(colWidth));
@@ -121,8 +123,8 @@ class CompareResult {
 /// await evalCompare(
 ///   'Summarization prompts',
 ///   variants: {
-///     'promptA': (api) async => await api.complete('Summarize: ...', prompt: promptA),
-///     'promptB': (api) async => await api.complete('Summarize: ...', prompt: promptB),
+///     'promptA': (api) async => await api.sendRequest('Summarize: ...', systemPrompt: promptA),
+///     'promptB': (api) async => await api.sendRequest('Summarize: ...', systemPrompt: promptB),
 ///   },
 ///   apiServices: [claudeService, openaiService],
 ///   matchers: [semanticallySimilarTo(reference)],
@@ -273,7 +275,8 @@ double welchTTest(List<double> sample1, List<double> sample2) {
   final t = (mean1 - mean2).abs() / se;
 
   // Approximate degrees of freedom (Welch-Satterthwaite)
-  final df = math.pow(se1 + se2, 2) /
+  final df =
+      math.pow(se1 + se2, 2) /
       (math.pow(se1, 2) / (n1 - 1) + math.pow(se2, 2) / (n2 - 1));
 
   // Approximate p-value using Student's t-distribution
@@ -315,11 +318,11 @@ double _incompleteBeta(double a, double b, double x) {
     final an = (n == 0)
         ? 1.0
         : (n.isOdd
-            ? -(a + (n - 1) / 2) *
-                (a + b + (n - 1) / 2) *
-                x /
-                ((a + n - 1) * (a + n))
-            : (n / 2) * (b - n / 2) * x / ((a + n - 1) * (a + n)));
+              ? -(a + (n - 1) / 2) *
+                    (a + b + (n - 1) / 2) *
+                    x /
+                    ((a + n - 1) * (a + n))
+              : (n / 2) * (b - n / 2) * x / ((a + n - 1) * (a + n)));
 
     term *= an;
     result += term;

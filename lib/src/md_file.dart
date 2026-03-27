@@ -6,27 +6,95 @@ typedef ParsedMarkdownBody = ({
   String body,
 });
 
-ParsedMarkdownBody parseMarkdownBody(String body) {
-  if (!body.startsWith('---\n')) {
-    return (title: '', frontmatter: {}, body: body);
+typedef ParsedMarkdownDocument = ({
+  bool hasFrontmatter,
+  bool isValidFrontmatter,
+  String title,
+  Map<String, dynamic> frontmatter,
+  String body,
+});
+
+final _frontmatterPattern = RegExp(
+  r'^---\n([\s\S]*?)^---(?:\n|$)',
+  multiLine: true,
+);
+
+ParsedMarkdownDocument inspectMarkdownBody(String source) {
+  if (!source.startsWith('---\n')) {
+    return (
+      hasFrontmatter: false,
+      isValidFrontmatter: false,
+      title: '',
+      frontmatter: <String, dynamic>{},
+      body: source,
+    );
   }
 
-  final endIndex = body.indexOf('\n---', 4);
-  if (endIndex == -1) {
-    return (title: '', frontmatter: {}, body: body);
+  final match = _frontmatterPattern.firstMatch(source);
+  if (match == null) {
+    return (
+      hasFrontmatter: true,
+      isValidFrontmatter: false,
+      title: '',
+      frontmatter: <String, dynamic>{},
+      body: source,
+    );
   }
 
-  final yamlString = body.substring(4, endIndex);
-  final markdown = body.substring(endIndex + 4).trim();
+  final yamlString = match.group(1)!;
+  final markdown = source.substring(match.end).trim();
 
   try {
-    final frontMatter = loadYaml(yamlString) as Map;
+    final parsedYaml = loadYaml(yamlString);
+    final frontmatter = parsedYaml == null
+        ? <String, dynamic>{}
+        : _normalizeYamlMap(parsedYaml);
+    final title = frontmatter['title'];
+
     return (
-      title: frontMatter['title'] ?? '',
-      frontmatter: Map<String, dynamic>.from(frontMatter),
+      hasFrontmatter: true,
+      isValidFrontmatter: true,
+      title: title is String ? title : '',
+      frontmatter: frontmatter,
       body: markdown,
     );
   } catch (_) {
-    return (title: '', frontmatter: <String, dynamic>{}, body: body);
+    return (
+      hasFrontmatter: true,
+      isValidFrontmatter: false,
+      title: '',
+      frontmatter: <String, dynamic>{},
+      body: source,
+    );
   }
+}
+
+ParsedMarkdownBody parseMarkdownBody(String body) {
+  final parsed = inspectMarkdownBody(body);
+  return (
+    title: parsed.title,
+    frontmatter: parsed.frontmatter,
+    body: parsed.body,
+  );
+}
+
+Map<String, dynamic> _normalizeYamlMap(Object? value) {
+  if (value is! Map) {
+    throw FormatException('Expected YAML frontmatter to parse to a map.');
+  }
+
+  return {
+    for (final entry in value.entries)
+      entry.key.toString(): _normalizeYamlValue(entry.value),
+  };
+}
+
+dynamic _normalizeYamlValue(Object? value) {
+  if (value is YamlMap) {
+    return _normalizeYamlMap(value);
+  }
+  if (value is YamlList) {
+    return value.map(_normalizeYamlValue).toList();
+  }
+  return value;
 }

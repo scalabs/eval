@@ -70,6 +70,12 @@ Matcher fieldOneOf(String jsonPath, List<dynamic> allowedValues) =>
 Matcher fieldHasType(String jsonPath, Type expectedType) =>
     _FieldHasType(jsonPath, expectedType);
 
+const _pathNotFound = _PathNotFound();
+
+class _PathNotFound {
+  const _PathNotFound();
+}
+
 class _MatchesSchema extends Matcher {
   final Map<String, dynamic> schema;
 
@@ -375,7 +381,7 @@ class _JsonArrayLengthBetween extends Matcher {
     }
 
     final value = _getPath(json, jsonPath);
-    if (value == null) {
+    if (value == _pathNotFound) {
       matchState['error'] = 'Path "$jsonPath" not found';
       return false;
     }
@@ -436,7 +442,7 @@ class _FieldOneOf extends Matcher {
     }
 
     final value = _getPath(json, jsonPath);
-    if (value == null && !allowedValues.contains(null)) {
+    if (value == _pathNotFound) {
       matchState['error'] = 'Path "$jsonPath" not found';
       return false;
     }
@@ -491,7 +497,7 @@ class _FieldHasType extends Matcher {
     }
 
     final value = _getPath(json, jsonPath);
-    if (value == null) {
+    if (value == _pathNotFound) {
       matchState['error'] = 'Path "$jsonPath" not found';
       return false;
     }
@@ -541,18 +547,18 @@ dynamic _getPath(dynamic json, String path) {
   dynamic current = json;
 
   for (final part in parts) {
-    if (current == null) return null;
+    if (current == null) return _pathNotFound;
 
     // Check if part is an array index
     final index = int.tryParse(part);
     if (index != null && current is List) {
-      if (index < 0 || index >= current.length) return null;
+      if (index < 0 || index >= current.length) return _pathNotFound;
       current = current[index];
     } else if (current is Map) {
-      if (!current.containsKey(part)) return null;
+      if (!current.containsKey(part)) return _pathNotFound;
       current = current[part];
     } else {
-      return null;
+      return _pathNotFound;
     }
   }
 

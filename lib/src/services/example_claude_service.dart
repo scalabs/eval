@@ -57,29 +57,34 @@ class ExampleClaudeService extends APICallService<ExampleClaudeModel> {
 
     store?.addUserMessage(prompt);
 
-    final body = jsonEncode({
+    final requestBody = <String, dynamic>{
       'model': modelName.modelId,
       'max_tokens': maxTokens,
-      if (systemPrompt != null) 'system': systemPrompt,
-      'messages': store?.messageHistory ??
-          [
-            {
-              'role': 'user',
-              'content': [
-                if (imageBytes != null)
-                  {
-                    'type': 'image',
-                    'source': {
-                      'type': 'base64',
-                      'media_type': 'image/png',
-                      'data': base64Encode(imageBytes),
-                    },
+      'messages': [
+        ...?store?.messageHistory,
+        if (store == null)
+          {
+            'role': 'user',
+            'content': [
+              if (imageBytes != null)
+                {
+                  'type': 'image',
+                  'source': {
+                    'type': 'base64',
+                    'media_type': 'image/png',
+                    'data': base64Encode(imageBytes),
                   },
-                {'type': 'text', 'text': prompt},
-              ],
-            },
-          ],
-    });
+                },
+              {'type': 'text', 'text': prompt},
+            ],
+          },
+      ],
+    };
+    if (systemPrompt != null) {
+      requestBody['system'] = systemPrompt;
+    }
+
+    final body = jsonEncode(requestBody);
 
     final response = await http.post(
       Uri.parse(baseUrl),

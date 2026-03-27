@@ -104,8 +104,9 @@ class _MatchesPattern extends Matcher {
   @override
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
     if (item is! String) return false;
-    final regex =
-        pattern is RegExp ? pattern as RegExp : RegExp(pattern.toString());
+    final regex = pattern is RegExp
+        ? pattern as RegExp
+        : RegExp(pattern.toString());
     return regex.hasMatch(item);
   }
 

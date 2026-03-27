@@ -93,34 +93,34 @@ Future<RagEvalResult> evaluateRag({
   final groundednessWeight = w['groundedness'] ?? 1.0;
   final relevancyWeight = w['relevancy'] ?? 1.0;
 
-  // Run all evaluations in parallel
   final precisionMatcher = _ContextPrecision(contexts, query, 0, apiService);
   final groundednessMatcher = _AnswerGroundedness(contexts, 0, apiService);
   final relevancyMatcher = _AnswerRelevancy(query, 0, apiService);
+  final precisionFuture = precisionMatcher.evaluateDetailed(answer);
+  final groundednessFuture = groundednessMatcher.evaluateDetailed(answer);
+  final relevancyFuture = relevancyMatcher.evaluateDetailed(answer);
+  final recallFuture = groundTruth == null
+      ? null
+      : _ContextRecall(
+          contexts,
+          groundTruth,
+          0,
+          apiService,
+        ).evaluateDetailed(answer);
 
-  final futures = <Future<double>>[
-    precisionMatcher.evaluateAsync(answer),
-    groundednessMatcher.evaluateAsync(answer),
-    relevancyMatcher.evaluateAsync(answer),
-  ];
+  final precisionResult = await precisionFuture;
+  final groundednessResult = await groundednessFuture;
+  final relevancyResult = await relevancyFuture;
+  final recallResult = recallFuture == null ? null : await recallFuture;
 
-  double? recallScore;
-  if (groundTruth != null) {
-    final recallMatcher = _ContextRecall(contexts, groundTruth, 0, apiService);
-    futures.add(recallMatcher.evaluateAsync(answer));
-  }
-
-  final scores = await Future.wait(futures);
-
-  final precisionScore = scores[0];
-  final groundednessScore = scores[1];
-  final relevancyScore = scores[2];
-  if (groundTruth != null && scores.length > 3) {
-    recallScore = scores[3];
-  }
+  final precisionScore = precisionResult.score;
+  final groundednessScore = groundednessResult.score;
+  final relevancyScore = relevancyResult.score;
+  final recallScore = recallResult?.score;
 
   // Calculate weighted average
-  var weightedSum = precisionScore * precisionWeight +
+  var weightedSum =
+      precisionScore * precisionWeight +
       groundednessScore * groundednessWeight +
       relevancyScore * relevancyWeight;
   var totalWeight = precisionWeight + groundednessWeight + relevancyWeight;
@@ -138,6 +138,14 @@ Future<RagEvalResult> evaluateRag({
     contextRecall: recallScore,
     answerGroundedness: groundednessScore,
     answerRelevancy: relevancyScore,
+    relevantContextIndices: precisionResult.relevantContextIndices,
+    unsupportedClaims: groundednessResult.unsupportedClaims,
+    reason: _joinReasons({
+      'precision': precisionResult.reason,
+      'recall': recallResult?.reason,
+      'groundedness': groundednessResult.reason,
+      'relevancy': relevancyResult.reason,
+    }),
   );
 }
 
@@ -158,8 +166,7 @@ AsyncLlmMatcher contextPrecision({
   required String query,
   double threshold = 0.7,
   APICallService? apiService,
-}) =>
-    _ContextPrecision(contexts, query, threshold, apiService);
+}) => _ContextPrecision(contexts, query, threshold, apiService);
 
 /// Measures the recall of retrieved contexts - whether all relevant info was retrieved.
 ///
@@ -178,8 +185,7 @@ AsyncLlmMatcher contextRecall({
   required String groundTruth,
   double threshold = 0.7,
   APICallService? apiService,
-}) =>
-    _ContextRecall(contexts, groundTruth, threshold, apiService);
+}) => _ContextRecall(contexts, groundTruth, threshold, apiService);
 
 /// Measures whether the answer is grounded in the provided contexts.
 ///
@@ -197,8 +203,7 @@ AsyncLlmMatcher answerGroundedness({
   required List<String> contexts,
   double threshold = 0.8,
   APICallService? apiService,
-}) =>
-    _AnswerGroundedness(contexts, threshold, apiService);
+}) => _AnswerGroundedness(contexts, threshold, apiService);
 
 /// Measures whether the answer is relevant to the query.
 ///
@@ -215,8 +220,7 @@ AsyncLlmMatcher answerRelevancy({
   required String query,
   double threshold = 0.7,
   APICallService? apiService,
-}) =>
-    _AnswerRelevancy(query, threshold, apiService);
+}) => _AnswerRelevancy(query, threshold, apiService);
 
 /// Measures the factual correctness of an answer against ground truth.
 ///
@@ -235,8 +239,7 @@ AsyncLlmMatcher answerCorrectness({
   required String groundTruth,
   double threshold = 0.7,
   APICallService? apiService,
-}) =>
-    _AnswerCorrectness(groundTruth, threshold, apiService);
+}) => _AnswerCorrectness(groundTruth, threshold, apiService);
 
 /// Computes a combined RAG score from multiple metrics.
 ///
@@ -266,8 +269,7 @@ AsyncLlmMatcher ragScore({
   double threshold = 0.7,
   Map<String, double>? weights,
   APICallService? apiService,
-}) =>
-    _RagScore(contexts, query, groundTruth, threshold, weights, apiService);
+}) => _RagScore(contexts, query, groundTruth, threshold, weights, apiService);
 
 class _ContextPrecision extends AsyncLlmMatcher {
   final List<String> contexts;
@@ -282,9 +284,8 @@ class _ContextPrecision extends AsyncLlmMatcher {
     super.apiService,
   );
 
-  @override
-  Future<double> evaluateAsync(String item) async {
-    if (contexts.isEmpty) return 0.0;
+  Future<_RagJudgeResponse> evaluateDetailed(String item) async {
+    if (contexts.isEmpty) return const _RagJudgeResponse(score: 0.0);
 
     final contextList = contexts
         .asMap()
@@ -292,7 +293,8 @@ class _ContextPrecision extends AsyncLlmMatcher {
         .map((e) => 'Context ${e.key + 1}: "${e.value}"')
         .join('\n\n');
 
-    final prompt = '''
+    final prompt =
+        '''
 Evaluate the precision of the retrieved contexts for answering the query.
 Precision measures what proportion of the contexts are actually relevant and useful.
 
@@ -318,7 +320,12 @@ Return ONLY a JSON object with the format:
           'You are a RAG evaluation expert. Evaluate context precision. Return only valid JSON.',
     );
 
-    return _parseScore(response);
+    return _parseRagJudgeResponse(response);
+  }
+
+  @override
+  Future<double> evaluateAsync(String item) async {
+    return (await evaluateDetailed(item)).score;
   }
 
   @override
@@ -335,7 +342,9 @@ Return ONLY a JSON object with the format:
     if (item is! String) {
       return mismatchDescription.add('is not a String');
     }
-    return mismatchDescription.add('requires async evaluation');
+    return mismatchDescription.add(
+      'must be evaluated asynchronously; use await expectAsync(actual, matcher)',
+    );
   }
 }
 
@@ -352,9 +361,8 @@ class _ContextRecall extends AsyncLlmMatcher {
     super.apiService,
   );
 
-  @override
-  Future<double> evaluateAsync(String item) async {
-    if (contexts.isEmpty) return 0.0;
+  Future<_RagJudgeResponse> evaluateDetailed(String item) async {
+    if (contexts.isEmpty) return const _RagJudgeResponse(score: 0.0);
 
     final contextList = contexts
         .asMap()
@@ -362,7 +370,8 @@ class _ContextRecall extends AsyncLlmMatcher {
         .map((e) => 'Context ${e.key + 1}: "${e.value}"')
         .join('\n\n');
 
-    final prompt = '''
+    final prompt =
+        '''
 Evaluate the recall of the retrieved contexts against the ground truth.
 Recall measures whether all information needed to produce the ground truth answer is present in the contexts.
 
@@ -389,7 +398,12 @@ Return ONLY a JSON object with the format:
           'You are a RAG evaluation expert. Evaluate context recall. Return only valid JSON.',
     );
 
-    return _parseScore(response);
+    return _parseRagJudgeResponse(response);
+  }
+
+  @override
+  Future<double> evaluateAsync(String item) async {
+    return (await evaluateDetailed(item)).score;
   }
 
   @override
@@ -406,7 +420,9 @@ Return ONLY a JSON object with the format:
     if (item is! String) {
       return mismatchDescription.add('is not a String');
     }
-    return mismatchDescription.add('requires async evaluation');
+    return mismatchDescription.add(
+      'must be evaluated asynchronously; use await expectAsync(actual, matcher)',
+    );
   }
 }
 
@@ -417,9 +433,8 @@ class _AnswerGroundedness extends AsyncLlmMatcher {
 
   const _AnswerGroundedness(this.contexts, this.threshold, super.apiService);
 
-  @override
-  Future<double> evaluateAsync(String item) async {
-    if (contexts.isEmpty) return 0.0;
+  Future<_RagJudgeResponse> evaluateDetailed(String item) async {
+    if (contexts.isEmpty) return const _RagJudgeResponse(score: 0.0);
 
     final contextList = contexts
         .asMap()
@@ -427,7 +442,8 @@ class _AnswerGroundedness extends AsyncLlmMatcher {
         .map((e) => 'Context ${e.key + 1}: "${e.value}"')
         .join('\n\n');
 
-    final prompt = '''
+    final prompt =
+        '''
 Evaluate the groundedness of the answer in the provided contexts.
 Groundedness measures whether every claim in the answer is supported by the contexts.
 Low groundedness indicates hallucination - claims not supported by the contexts.
@@ -455,7 +471,12 @@ Return ONLY a JSON object with the format:
           'You are a RAG evaluation expert. Evaluate answer groundedness and detect hallucinations. Return only valid JSON.',
     );
 
-    return _parseScore(response);
+    return _parseRagJudgeResponse(response);
+  }
+
+  @override
+  Future<double> evaluateAsync(String item) async {
+    return (await evaluateDetailed(item)).score;
   }
 
   @override
@@ -472,7 +493,9 @@ Return ONLY a JSON object with the format:
     if (item is! String) {
       return mismatchDescription.add('is not a String');
     }
-    return mismatchDescription.add('requires async evaluation');
+    return mismatchDescription.add(
+      'must be evaluated asynchronously; use await expectAsync(actual, matcher)',
+    );
   }
 }
 
@@ -483,9 +506,9 @@ class _AnswerCorrectness extends AsyncLlmMatcher {
 
   const _AnswerCorrectness(this.groundTruth, this.threshold, super.apiService);
 
-  @override
-  Future<double> evaluateAsync(String item) async {
-    final prompt = '''
+  Future<_RagJudgeResponse> evaluateDetailed(String item) async {
+    final prompt =
+        '''
 Evaluate the factual correctness of the answer against the ground truth.
 Correctness measures whether the answer contains the same facts as the ground truth.
 Focus on factual accuracy, not phrasing or style.
@@ -518,7 +541,12 @@ Return ONLY a JSON object with the format:
           'You are a RAG evaluation expert. Evaluate answer correctness against ground truth. Return only valid JSON.',
     );
 
-    return _parseScore(response);
+    return _parseRagJudgeResponse(response);
+  }
+
+  @override
+  Future<double> evaluateAsync(String item) async {
+    return (await evaluateDetailed(item)).score;
   }
 
   @override
@@ -535,7 +563,9 @@ Return ONLY a JSON object with the format:
     if (item is! String) {
       return mismatchDescription.add('is not a String');
     }
-    return mismatchDescription.add('requires async evaluation');
+    return mismatchDescription.add(
+      'must be evaluated asynchronously; use await expectAsync(actual, matcher)',
+    );
   }
 }
 
@@ -546,9 +576,9 @@ class _AnswerRelevancy extends AsyncLlmMatcher {
 
   const _AnswerRelevancy(this.query, this.threshold, super.apiService);
 
-  @override
-  Future<double> evaluateAsync(String item) async {
-    final prompt = '''
+  Future<_RagJudgeResponse> evaluateDetailed(String item) async {
+    final prompt =
+        '''
 Evaluate the relevancy of the answer to the query.
 Relevancy measures whether the answer actually addresses what was asked.
 An answer can be relevant even if incorrect, as long as it attempts to answer the question.
@@ -573,7 +603,12 @@ Return ONLY a JSON object with the format:
           'You are a RAG evaluation expert. Evaluate answer relevancy. Return only valid JSON.',
     );
 
-    return _parseScore(response);
+    return _parseRagJudgeResponse(response);
+  }
+
+  @override
+  Future<double> evaluateAsync(String item) async {
+    return (await evaluateDetailed(item)).score;
   }
 
   @override
@@ -590,7 +625,9 @@ Return ONLY a JSON object with the format:
     if (item is! String) {
       return mismatchDescription.add('is not a String');
     }
-    return mismatchDescription.add('requires async evaluation');
+    return mismatchDescription.add(
+      'must be evaluated asynchronously; use await expectAsync(actual, matcher)',
+    );
   }
 }
 
@@ -683,48 +720,120 @@ class _RagScore extends AsyncLlmMatcher {
     if (item is! String) {
       return mismatchDescription.add('is not a String');
     }
-    return mismatchDescription.add('requires async evaluation');
+    return mismatchDescription.add(
+      'must be evaluated asynchronously; use await expectAsync(actual, matcher)',
+    );
   }
 }
 
-/// Parses a score from an LLM response.
-/// Expects JSON format: {"score": 0.X, ...}
-double _parseScore(String response) {
+class _RagJudgeResponse {
+  final double score;
+  final String? reason;
+  final List<int>? relevantContextIndices;
+  final List<String>? unsupportedClaims;
+
+  const _RagJudgeResponse({
+    required this.score,
+    this.reason,
+    this.relevantContextIndices,
+    this.unsupportedClaims,
+  });
+}
+
+_RagJudgeResponse _parseRagJudgeResponse(String response) {
   try {
-    // Try to extract JSON from the response
-    var jsonStr = response;
-
-    // Handle markdown code blocks
-    final jsonMatch = RegExp(
-      r'```(?:json)?\s*([\s\S]*?)```',
-    ).firstMatch(response);
-    if (jsonMatch != null) {
-      jsonStr = jsonMatch.group(1)!.trim();
-    }
-
-    // Try to find JSON object in the response
-    final objectMatch = RegExp(
-      r'\{[^{}]*"score"\s*:\s*[\d.]+[^{}]*\}',
-    ).firstMatch(jsonStr);
-    if (objectMatch != null) {
-      jsonStr = objectMatch.group(0)!;
-    }
-
-    final json = jsonDecode(jsonStr);
+    final json = _decodeJudgeJson(response);
     final score = json['score'];
     if (score is num) {
-      return score.toDouble().clamp(0.0, 1.0);
+      return _RagJudgeResponse(
+        score: score.toDouble().clamp(0.0, 1.0),
+        reason: json['reason'] as String?,
+        relevantContextIndices: _coerceRelevantContextIndices(
+          json['relevant_contexts'],
+        ),
+        unsupportedClaims: _coerceStringList(json['unsupported_claims']),
+      );
     }
     throw FormatException('Score not found in response');
   } catch (e) {
-    // If parsing fails, try to extract just a number
     final numberMatch = RegExp(r'0?\.\d+|\d+\.?\d*').firstMatch(response);
     if (numberMatch != null) {
       final value = double.tryParse(numberMatch.group(0)!);
       if (value != null) {
-        return value.clamp(0.0, 1.0);
+        return _RagJudgeResponse(score: value.clamp(0.0, 1.0));
       }
     }
     throw FormatException('Could not parse score from LLM response: $response');
   }
+}
+
+Map<String, dynamic> _decodeJudgeJson(String response) {
+  var jsonStr = response.trim();
+
+  final jsonMatch = RegExp(
+    r'```(?:json)?\s*([\s\S]*?)```',
+  ).firstMatch(response);
+  if (jsonMatch != null) {
+    jsonStr = jsonMatch.group(1)!.trim();
+  }
+
+  try {
+    final decoded = jsonDecode(jsonStr);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+  } catch (_) {
+    final objectMatch = RegExp(r'\{[\s\S]*\}').firstMatch(jsonStr);
+    if (objectMatch != null) {
+      final decoded = jsonDecode(objectMatch.group(0)!);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    }
+  }
+
+  throw FormatException('Could not decode judge JSON.');
+}
+
+List<int>? _coerceRelevantContextIndices(Object? value) {
+  if (value is! List) return null;
+
+  return value
+      .map((entry) {
+        if (entry is int) return entry > 0 ? entry - 1 : entry;
+        if (entry is num) {
+          final normalized = entry.toInt();
+          return normalized > 0 ? normalized - 1 : normalized;
+        }
+        if (entry is String) {
+          final parsed = int.tryParse(entry);
+          if (parsed != null) {
+            return parsed > 0 ? parsed - 1 : parsed;
+          }
+        }
+        return null;
+      })
+      .whereType<int>()
+      .toList();
+}
+
+List<String>? _coerceStringList(Object? value) {
+  if (value is! List) return null;
+  return value.map((entry) => entry.toString()).toList();
+}
+
+String? _joinReasons(Map<String, String?> reasons) {
+  final parts = [
+    for (final entry in reasons.entries)
+      if (entry.value != null && entry.value!.trim().isNotEmpty)
+        '${entry.key}: ${entry.value!.trim()}',
+  ];
+
+  return parts.isEmpty ? null : parts.join(' | ');
 }

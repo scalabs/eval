@@ -1,5 +1,31 @@
 import 'package:eval/eval.dart' hide expect;
-import 'package:test/test.dart';
+import 'package:test/test.dart' hide expectAsync;
+
+enum _TestJudgeModel { mock }
+
+class _FakeJudgeService extends APICallService<_TestJudgeModel> {
+  final String response;
+
+  _FakeJudgeService(this.response)
+    : super(
+        baseUrl: 'https://example.com',
+        apiKey: 'test-key',
+        defaultModel: _TestJudgeModel.mock,
+        timeout: Duration.zero,
+        stateful: false,
+      );
+
+  @override
+  Future<String> apiCallImpl(
+    String prompt,
+    String? systemPrompt,
+    _TestJudgeModel modelName, {
+    imageBytes,
+    fileBytes,
+  }) async {
+    return response;
+  }
+}
 
 void main() {
   group('LlmEvalResult', () {
@@ -96,8 +122,7 @@ void main() {
 
   group('AsyncLlmMatcher', () {
     test('checkThreshold works for lower bound matchers', () {
-      final matcher = semanticallySimilarTo('ref', threshold: 0.7);
-      final asyncMatcher = matcher as AsyncLlmMatcher;
+      final asyncMatcher = semanticallySimilarTo('ref', threshold: 0.7);
 
       expect(asyncMatcher.threshold, equals(0.7));
       expect(asyncMatcher.isUpperBoundCheck, isFalse);
@@ -107,8 +132,7 @@ void main() {
     });
 
     test('checkThreshold works for upper bound matchers (toxicity)', () {
-      final matcher = isNotToxic(threshold: 0.3);
-      final asyncMatcher = matcher as AsyncLlmMatcher;
+      final asyncMatcher = isNotToxic(threshold: 0.3);
 
       expect(asyncMatcher.threshold, equals(0.3));
       expect(asyncMatcher.isUpperBoundCheck, isTrue);
@@ -118,8 +142,7 @@ void main() {
     });
 
     test('checkThreshold works for upper bound matchers (bias)', () {
-      final matcher = isNotBiased(threshold: 0.3);
-      final asyncMatcher = matcher as AsyncLlmMatcher;
+      final asyncMatcher = isNotBiased(threshold: 0.3);
 
       expect(asyncMatcher.isUpperBoundCheck, isTrue);
       expect(asyncMatcher.checkThreshold(0.1), isTrue);
@@ -127,8 +150,7 @@ void main() {
     });
 
     test('answersQuestion uses lower bound check', () {
-      final matcher = answersQuestion('question?', threshold: 0.5);
-      final asyncMatcher = matcher as AsyncLlmMatcher;
+      final asyncMatcher = answersQuestion('question?', threshold: 0.5);
 
       expect(asyncMatcher.isUpperBoundCheck, isFalse);
       expect(asyncMatcher.checkThreshold(0.6), isTrue);
@@ -136,12 +158,48 @@ void main() {
     });
 
     test('isFaithfulTo uses lower bound check', () {
-      final matcher = isFaithfulTo('context', threshold: 0.8);
-      final asyncMatcher = matcher as AsyncLlmMatcher;
+      final asyncMatcher = isFaithfulTo('context', threshold: 0.8);
 
       expect(asyncMatcher.isUpperBoundCheck, isFalse);
       expect(asyncMatcher.checkThreshold(0.9), isTrue);
       expect(asyncMatcher.checkThreshold(0.7), isFalse);
+    });
+
+    test('fails in sync matcher contexts with async guidance', () {
+      final matcher = semanticallySimilarTo('reference');
+      final matchState = <dynamic, dynamic>{};
+
+      expect(matcher.matches('actual', matchState), isFalse);
+
+      final description = StringDescription();
+      matcher.describeMismatch('actual', description, matchState, false);
+
+      expect(description.toString(), contains('expectAsync'));
+    });
+
+    test('expectAsync passes for matching score', () async {
+      await expectAsync(
+        'actual',
+        semanticallySimilarTo(
+          'reference',
+          apiService: _FakeJudgeService('{"score": 0.95, "reason": "close"}'),
+        ),
+      );
+    });
+
+    test('expectAsync fails for score below threshold', () async {
+      await expectLater(
+        expectAsync(
+          'actual',
+          semanticallySimilarTo(
+            'reference',
+            apiService: _FakeJudgeService(
+              '{"score": 0.1, "reason": "not similar"}',
+            ),
+          ),
+        ),
+        throwsA(isA<TestFailure>()),
+      );
     });
   });
 }

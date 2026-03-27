@@ -153,8 +153,8 @@ class _EditDistanceLessThan extends Matcher {
 
   @override
   Description describe(Description description) => description.add(
-        'has edit distance less than $threshold from "$reference"',
-      );
+    'has edit distance less than $threshold from "$reference"',
+  );
 
   @override
   Description describeMismatch(
@@ -190,8 +190,8 @@ class _EditDistanceRatio extends Matcher {
 
   @override
   Description describe(Description description) => description.add(
-        'has edit distance ratio less than $threshold from "$reference"',
-      );
+    'has edit distance ratio less than $threshold from "$reference"',
+  );
 
   @override
   Description describeMismatch(
@@ -226,8 +226,8 @@ class _JaroWinklerSimilarity extends Matcher {
 
   @override
   Description describe(Description description) => description.add(
-        'has Jaro-Winkler similarity >= $threshold with "$reference"',
-      );
+    'has Jaro-Winkler similarity >= $threshold with "$reference"',
+  );
 
   @override
   Description describeMismatch(

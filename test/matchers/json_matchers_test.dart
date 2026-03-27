@@ -140,6 +140,10 @@ void main() {
       expect('{"value": null}', hasJsonPathValue('value', null));
     });
 
+    test('does not treat missing path as null', () {
+      expect('{"other": null}', isNot(hasJsonPathValue('value', null)));
+    });
+
     test('does not match wrong value', () {
       expect('{"message": "Hello"}', isNot(hasJsonPathValue('message', 'Hi')));
     });

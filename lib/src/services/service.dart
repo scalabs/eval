@@ -18,50 +18,50 @@ abstract class ApiException implements Exception {
 
 /// Thrown when hitting API rate limits (HTTP 429).
 class ApiRateLimitException extends ApiException {
-  ApiRateLimitException(String message, {Map<String, dynamic>? context})
-      : super(message, statusCode: 429, context: context);
+  ApiRateLimitException(super.message, {super.context})
+    : super(statusCode: 429);
 }
 
 /// Thrown when the server is overloaded (HTTP 529).
 class ApiServerOverloadException extends ApiException {
-  ApiServerOverloadException(String message, {Map<String, dynamic>? context})
-      : super(message, statusCode: 529, context: context);
+  ApiServerOverloadException(super.message, {super.context})
+    : super(statusCode: 529);
 }
 
 /// Thrown when authentication fails (HTTP 401).
 class ApiUnauthorizedException extends ApiException {
-  ApiUnauthorizedException(String message, {Map<String, dynamic>? context})
-      : super(message, statusCode: 401, context: context);
+  ApiUnauthorizedException(super.message, {super.context})
+    : super(statusCode: 401);
 }
 
 /// Thrown for general HTTP errors.
 class ApiHttpException extends ApiException {
-  ApiHttpException(
-    String message,
-    int statusCode, {
-    Map<String, dynamic>? context,
-  }) : super(message, statusCode: statusCode, context: context);
+  ApiHttpException(super.message, int statusCode, {super.context})
+    : super(statusCode: statusCode);
 }
 
 typedef LLMCallback = Future<String> Function();
 typedef DelayedLLMCallbackRecord = ({Duration delay, LLMCallback callback});
 
 class APICallQueue {
-  final Map<String, Future> queues = {};
+  final Map<String, Future<void>> queues = {};
 
   Future<String> addCallByType<E>(
     LLMCallback callback,
     Duration timeout,
   ) async {
     final key = E.toString();
-    if (queues[key] == null) {
+    final previous = queues[key];
+    if (previous == null) {
       throw Exception('No call queue was registered for service $key');
     }
-    final result = queues[key]!
-        .then((_) => Future.delayed(timeout))
-        .then((value) => callback());
+    final result = previous
+        .then((_) => Future<void>.delayed(timeout))
+        .then((_) => callback());
 
-    queues[key] = result;
+    // Swallow errors in the internal chain so one failed request does not
+    // poison the queue for all future requests of the same service type.
+    queues[key] = result.then<void>((_) {}).catchError((_) {});
     return result;
   }
 
@@ -119,11 +119,11 @@ abstract class APICallService<E extends Enum> {
     E? modelName,
   }) async {
     callback() => apiCallImpl(
-          prompt,
-          systemPrompt,
-          modelName ?? defaultModel,
-          imageBytes: imageBytes,
-        );
+      prompt,
+      systemPrompt,
+      modelName ?? defaultModel,
+      imageBytes: imageBytes,
+    );
 
     if (timeout != Duration.zero) {
       return queue.addCallByType<E>(callback, timeout);
@@ -139,11 +139,11 @@ abstract class APICallService<E extends Enum> {
     E? modelName,
   }) async {
     callback() => apiCallImpl(
-          prompt,
-          systemPrompt,
-          modelName ?? defaultModel,
-          fileBytes: fileBytes,
-        );
+      prompt,
+      systemPrompt,
+      modelName ?? defaultModel,
+      fileBytes: fileBytes,
+    );
 
     if (timeout != Duration.zero) {
       return queue.addCallByType<E>(callback, timeout);

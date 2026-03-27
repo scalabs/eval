@@ -333,6 +333,11 @@ void main() {
       expect(json, isNot(fieldOneOf('value', ['option'])));
     });
 
+    test('does not treat missing path as null', () {
+      final json = jsonEncode({'other': 'value'});
+      expect(json, isNot(fieldOneOf('value', [null])));
+    });
+
     test('handles numeric values', () {
       final json = jsonEncode({'priority': 1});
       expect(json, fieldOneOf('priority', [1, 2, 3]));

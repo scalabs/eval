@@ -26,6 +26,12 @@ title: Title Only
 ---
 ''';
 
+  const emptyFrontmatter = '''---
+---
+
+Just body.
+''';
+
   group('hasValidFrontmatter', () {
     test('matches valid frontmatter', () {
       expect(validMarkdown, hasValidFrontmatter);
@@ -33,6 +39,10 @@ title: Title Only
 
     test('matches frontmatter with empty body', () {
       expect(emptyBody, hasValidFrontmatter);
+    });
+
+    test('matches empty frontmatter', () {
+      expect(emptyFrontmatter, hasValidFrontmatter);
     });
 
     test('does not match content without frontmatter', () {
@@ -47,6 +57,16 @@ title: Title Only
       const malformed = '''---
 title: Broken
 No closing delimiter
+''';
+      expect(malformed, isNot(hasValidFrontmatter));
+    });
+
+    test('does not match malformed yaml with closing delimiter', () {
+      const malformed = '''---
+title: [broken
+---
+
+Body.
 ''';
       expect(malformed, isNot(hasValidFrontmatter));
     });

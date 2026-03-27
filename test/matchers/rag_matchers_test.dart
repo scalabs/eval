@@ -1,5 +1,37 @@
 import 'package:eval/src/matchers/rag_matchers.dart';
+import 'package:eval/src/services/service.dart';
 import 'package:test/test.dart';
+
+enum _TestRagModel { mock }
+
+class _FakeRagService extends APICallService<_TestRagModel> {
+  final Map<String, String> responsesByPromptFragment;
+
+  _FakeRagService(this.responsesByPromptFragment)
+    : super(
+        baseUrl: 'https://example.com',
+        apiKey: 'test-key',
+        defaultModel: _TestRagModel.mock,
+        timeout: Duration.zero,
+        stateful: false,
+      );
+
+  @override
+  Future<String> apiCallImpl(
+    String prompt,
+    String? systemPrompt,
+    _TestRagModel modelName, {
+    imageBytes,
+    fileBytes,
+  }) async {
+    for (final entry in responsesByPromptFragment.entries) {
+      if (prompt.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+    throw StateError('No fake response configured for prompt: $prompt');
+  }
+}
 
 void main() {
   group('contextPrecision', () {
@@ -494,6 +526,50 @@ Line 3''',
       expect(result.relevantContextIndices, equals([0, 2, 4]));
       expect(result.unsupportedClaims, equals(['claim1', 'claim2']));
       expect(result.reason, contains('mostly aligns'));
+    });
+  });
+
+  group('evaluateRag', () {
+    test('preserves detailed evidence from judge responses', () async {
+      final result = await evaluateRag(
+        answer: 'Generated answer',
+        contexts: ['context 1', 'context 2', 'context 3'],
+        query: 'What happened?',
+        groundTruth: 'Expected answer',
+        apiService: _FakeRagService({
+          'Evaluate the precision of the retrieved contexts':
+              '{"score": 0.67, "relevant_contexts": [1, 3], "reason": "Contexts 1 and 3 are relevant."}',
+          'Evaluate the groundedness of the answer':
+              '{"score": 0.8, "unsupported_claims": ["claim 2"], "reason": "Most claims are supported."}',
+          'Evaluate the relevancy of the answer':
+              '{"score": 0.9, "reason": "The answer addresses the query directly."}',
+          'Evaluate the recall of the retrieved contexts':
+              '{"score": 0.75, "reason": "Most ground-truth claims are covered."}',
+        }),
+      );
+
+      expect(result.contextPrecision, closeTo(0.67, 0.001));
+      expect(result.contextRecall, closeTo(0.75, 0.001));
+      expect(result.answerGroundedness, closeTo(0.8, 0.001));
+      expect(result.answerRelevancy, closeTo(0.9, 0.001));
+      expect(result.relevantContextIndices, equals([0, 2]));
+      expect(result.unsupportedClaims, equals(['claim 2']));
+      expect(
+        result.reason,
+        contains('precision: Contexts 1 and 3 are relevant.'),
+      );
+      expect(
+        result.reason,
+        contains('groundedness: Most claims are supported.'),
+      );
+      expect(
+        result.reason,
+        contains('relevancy: The answer addresses the query directly.'),
+      );
+      expect(
+        result.reason,
+        contains('recall: Most ground-truth claims are covered.'),
+      );
     });
   });
 }

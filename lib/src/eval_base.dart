@@ -123,7 +123,8 @@ Future<void> expectAsync(
   }
 
   if (!passed) {
-    final msg = reason ??
+    final msg =
+        reason ??
         'Expected: ${matcher.describe(test.StringDescription())}\n'
             '  Actual: "$actual"\n'
             '   Score: ${score.toStringAsFixed(3)} '

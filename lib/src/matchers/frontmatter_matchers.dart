@@ -53,18 +53,11 @@ class _ParseFailed {
 /// Attempts to parse frontmatter, returns _parseFailed on failure.
 Object _tryParse(Object? item) {
   if (item is! String) return _parseFailed;
-  if (!item.startsWith('---\n')) return _parseFailed;
-
-  try {
-    final result = parseMarkdownBody(item);
-    // Check if parsing actually succeeded (frontmatter was found)
-    if (result.frontmatter.isEmpty && !item.contains('\n---')) {
-      return _parseFailed;
-    }
-    return result;
-  } catch (_) {
+  final result = inspectMarkdownBody(item);
+  if (!result.hasFrontmatter || !result.isValidFrontmatter) {
     return _parseFailed;
   }
+  return result;
 }
 
 class _HasValidFrontmatter extends Matcher {
@@ -72,11 +65,9 @@ class _HasValidFrontmatter extends Matcher {
 
   @override
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
-    final result = _tryParse(item);
-    if (result == _parseFailed) return false;
-    final parsed = result as ParsedMarkdownBody;
-    // Valid if we successfully parsed frontmatter
-    return parsed.frontmatter.isNotEmpty || item.toString().contains('\n---');
+    if (item is! String) return false;
+    final parsed = inspectMarkdownBody(item);
+    return parsed.hasFrontmatter && parsed.isValidFrontmatter;
   }
 
   @override
@@ -109,7 +100,7 @@ class _HasFrontmatterTitle extends Matcher {
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
     final result = _tryParse(item);
     if (result == _parseFailed) return false;
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     return parsed.title.isNotEmpty;
   }
 
@@ -144,7 +135,7 @@ class _HasFrontmatterKey extends Matcher {
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
     final result = _tryParse(item);
     if (result == _parseFailed) return false;
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     return parsed.frontmatter.containsKey(key);
   }
 
@@ -166,7 +157,7 @@ class _HasFrontmatterKey extends Matcher {
     if (result == _parseFailed) {
       return mismatchDescription.add('failed to parse frontmatter');
     }
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     return mismatchDescription.add(
       'frontmatter keys are: ${parsed.frontmatter.keys.toList()}',
     );
@@ -183,7 +174,7 @@ class _HasFrontmatterValue extends Matcher {
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
     final result = _tryParse(item);
     if (result == _parseFailed) return false;
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     if (!parsed.frontmatter.containsKey(key)) return false;
     return parsed.frontmatter[key] == expectedValue;
   }
@@ -206,7 +197,7 @@ class _HasFrontmatterValue extends Matcher {
     if (result == _parseFailed) {
       return mismatchDescription.add('failed to parse frontmatter');
     }
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     if (!parsed.frontmatter.containsKey(key)) {
       return mismatchDescription.add('key "$key" not found in frontmatter');
     }
@@ -226,7 +217,7 @@ class _FrontmatterKeyMatches extends Matcher {
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
     final result = _tryParse(item);
     if (result == _parseFailed) return false;
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     if (!parsed.frontmatter.containsKey(key)) return false;
     return matcher.matches(parsed.frontmatter[key], matchState);
   }
@@ -251,7 +242,7 @@ class _FrontmatterKeyMatches extends Matcher {
     if (result == _parseFailed) {
       return mismatchDescription.add('failed to parse frontmatter');
     }
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     if (!parsed.frontmatter.containsKey(key)) {
       return mismatchDescription.add('key "$key" not found in frontmatter');
     }
@@ -272,7 +263,7 @@ class _HasMarkdownBody extends Matcher {
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
     final result = _tryParse(item);
     if (result == _parseFailed) return false;
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     return parsed.body.trim().isNotEmpty;
   }
 
@@ -307,7 +298,7 @@ class _BodyContains extends Matcher {
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
     final result = _tryParse(item);
     if (result == _parseFailed) return false;
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     return parsed.body.contains(text);
   }
 
@@ -342,7 +333,7 @@ class _BodyMatches extends Matcher {
   bool matches(Object? item, Map<dynamic, dynamic> matchState) {
     final result = _tryParse(item);
     if (result == _parseFailed) return false;
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     return matcher.matches(parsed.body, matchState);
   }
 
@@ -366,7 +357,7 @@ class _BodyMatches extends Matcher {
     if (result == _parseFailed) {
       return mismatchDescription.add('failed to parse frontmatter');
     }
-    final parsed = result as ParsedMarkdownBody;
+    final parsed = result as ParsedMarkdownDocument;
     mismatchDescription.add('body ');
     return matcher.describeMismatch(
       parsed.body,

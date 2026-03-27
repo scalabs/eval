@@ -139,8 +139,6 @@ void main() {}
     });
 
     test('handles frontmatter with only dashes', () {
-      // Note: Empty YAML parses as null, which causes the parser to fail
-      // and return the original input. This is expected behavior.
       const input = '''---
 ---
 
@@ -149,8 +147,9 @@ Just body.
 
       final result = parseMarkdownBody(input);
 
-      // Parser fails on empty YAML, returns original
-      expect(result.body, equals(input));
+      expect(result.title, equals(''));
+      expect(result.frontmatter, isEmpty);
+      expect(result.body, equals('Just body.'));
     });
   });
 }
