@@ -118,16 +118,33 @@ class CompareResult {
 /// The outputs are evaluated against the provided matchers, and statistics
 /// are computed to determine the winning variant.
 ///
+/// [apiServices] are the generation services under test.
+///
+/// If your [matchers] use LLM-as-judge scoring and you do not want to rely on
+/// the global `llmMatcherService`, pass an explicit judge service to each
+/// matcher with `apiService:`. That judge can be the same as or different from
+/// the generation services.
+///
 /// Example:
 /// ```dart
+/// final judgeService = MyJudgeService(apiKey: '...');
+///
 /// await evalCompare(
 ///   'Summarization prompts',
 ///   variants: {
-///     'promptA': (api) async => await api.sendRequest('Summarize: ...', systemPrompt: promptA),
-///     'promptB': (api) async => await api.sendRequest('Summarize: ...', systemPrompt: promptB),
+///     'promptA': (apiService) => apiService.sendRequest(
+///       'Summarize: ...',
+///       systemPrompt: promptA,
+///     ),
+///     'promptB': (apiService) => apiService.sendRequest(
+///       'Summarize: ...',
+///       systemPrompt: promptB,
+///     ),
 ///   },
 ///   apiServices: [claudeService, openaiService],
-///   matchers: [semanticallySimilarTo(reference)],
+///   matchers: [
+///     semanticallySimilarTo(reference, apiService: judgeService),
+///   ],
 ///   numberOfRuns: 5,
 /// );
 /// ```

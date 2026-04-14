@@ -156,9 +156,11 @@ Future<RagEvalResult> evaluateRag({
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(answer, contextPrecision(
 ///   contexts: retrievedDocuments,
 ///   query: 'What is the capital of France?',
+///   apiService: apiService,
 /// ));
 /// ```
 AsyncLlmMatcher contextPrecision({
@@ -175,9 +177,11 @@ AsyncLlmMatcher contextPrecision({
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(answer, contextRecall(
 ///   contexts: retrievedDocuments,
 ///   groundTruth: 'Paris is the capital of France.',
+///   apiService: apiService,
 /// ));
 /// ```
 AsyncLlmMatcher contextRecall({
@@ -195,8 +199,10 @@ AsyncLlmMatcher contextRecall({
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(answer, answerGroundedness(
 ///   contexts: retrievedDocuments,
+///   apiService: apiService,
 /// ));
 /// ```
 AsyncLlmMatcher answerGroundedness({
@@ -212,8 +218,10 @@ AsyncLlmMatcher answerGroundedness({
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(answer, answerRelevancy(
 ///   query: 'What is the capital of France?',
+///   apiService: apiService,
 /// ));
 /// ```
 AsyncLlmMatcher answerRelevancy({
@@ -231,8 +239,10 @@ AsyncLlmMatcher answerRelevancy({
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(answer, answerCorrectness(
 ///   groundTruth: 'Paris is the capital of France.',
+///   apiService: apiService,
 /// ));
 /// ```
 AsyncLlmMatcher answerCorrectness({
@@ -255,11 +265,13 @@ AsyncLlmMatcher answerCorrectness({
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(answer, ragScore(
 ///   contexts: retrievedDocuments,
 ///   query: 'What is the capital of France?',
 ///   groundTruth: 'Paris is the capital of France.',
 ///   weights: {'groundedness': 2.0, 'precision': 1.0}, // prioritize groundedness
+///   apiService: apiService,
 /// ));
 /// ```
 AsyncLlmMatcher ragScore({

@@ -6,15 +6,37 @@ import '../md_file.dart';
 ///
 /// The string must start with `---\n`, contain valid YAML frontmatter,
 /// and end the frontmatter section with `\n---`.
+///
+/// Example:
+/// ```dart
+/// expect('---\ntitle: Hello\n---\n# Heading', hasValidFrontmatter);
+/// ```
 const Matcher hasValidFrontmatter = _HasValidFrontmatter();
 
 /// Matches a Jekyll-style markdown string that has a non-empty title in frontmatter.
+///
+/// Example:
+/// ```dart
+/// expect('---\ntitle: Hello\n---\n# Heading', hasFrontmatterTitle);
+/// ```
 const Matcher hasFrontmatterTitle = _HasFrontmatterTitle();
 
 /// Matches a Jekyll-style markdown string that has the specified [key] in frontmatter.
+///
+/// Example:
+/// ```dart
+/// expect('---\ntitle: Hello\ndraft: false\n---\n# Heading',
+///     hasFrontmatterKey('draft'));
+/// ```
 Matcher hasFrontmatterKey(String key) => _HasFrontmatterKey(key);
 
 /// Matches a Jekyll-style markdown string that has the specified [value] for [key] in frontmatter.
+///
+/// Example:
+/// ```dart
+/// expect('---\ndraft: false\n---\n# Heading',
+///     hasFrontmatterValue('draft', false));
+/// ```
 Matcher hasFrontmatterValue(String key, Object? value) =>
     _HasFrontmatterValue(key, value);
 
@@ -29,9 +51,19 @@ Matcher frontmatterKeyMatches(String key, Matcher matcher) =>
     _FrontmatterKeyMatches(key, matcher);
 
 /// Matches a Jekyll-style markdown string that has a non-empty body (content after frontmatter).
+///
+/// Example:
+/// ```dart
+/// expect('---\ntitle: Hello\n---\n# Heading', hasMarkdownBody);
+/// ```
 const Matcher hasMarkdownBody = _HasMarkdownBody();
 
 /// Matches a Jekyll-style markdown string where the body contains the specified [text].
+///
+/// Example:
+/// ```dart
+/// expect('---\ntitle: Hello\n---\n# Heading', bodyContains('# Heading'));
+/// ```
 Matcher bodyContains(String text) => _BodyContains(text);
 
 /// Matches a Jekyll-style markdown string where the body matches the given [matcher].

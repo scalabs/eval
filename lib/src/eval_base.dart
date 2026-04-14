@@ -10,6 +10,10 @@ import 'statistics.dart';
 
 export 'package:test/test.dart' hide expect, expectAsync;
 
+/// Body of an [eval] run.
+///
+/// The callback receives the API service for the current model/run so the same
+/// evaluation logic can be reused across all configured services.
 typedef TestFunction = FutureOr<void> Function(APICallService apiService);
 
 /// Pass/fail counts per test run key.
@@ -20,6 +24,43 @@ Map<String, List<double>> testScores = {};
 
 String currentTestRunKey = '';
 
+/// Registers an LLM evaluation on top of `package:test`.
+///
+/// [eval] wraps normal Dart test groups/tests and runs [testFunction] once for
+/// each service in [apiServices] and once for each repetition in
+/// [numberOfRunsPerLLM].
+///
+/// Inside [testFunction]:
+/// - use [expect] for synchronous assertions
+/// - use [expectAsync] for LLM-as-judge and RAG matchers
+///
+/// Both wrappers still perform normal assertions. The difference is that inside
+/// [eval], they also record pass/fail counts. [expectAsync] additionally records
+/// numeric scores, which are summarized as aggregate statistics when the group
+/// finishes.
+///
+/// Example:
+/// ```dart
+/// await eval(
+///   'answers a simple question',
+///   (apiService) async {
+///     final answer = await apiService.sendRequest(
+///       'What is the capital of France?',
+///     );
+///
+///     expect(answer, containsIgnoreCase('paris'));
+///     await expectAsync(
+///       answer,
+///       answersQuestion(
+///         'What is the capital of France?',
+///         apiService: apiService,
+///       ),
+///     );
+///   },
+///   apiServices: [myService],
+///   numberOfRunsPerLLM: 3,
+/// );
+/// ```
 Future<void> eval(
   String description,
   TestFunction testFunction, {
@@ -56,6 +97,8 @@ Future<void> eval(
                   current.$3 + 1,
                 );
                 rethrow;
+              } finally {
+                currentTestRunKey = '';
               }
             });
           }
@@ -73,6 +116,12 @@ Future<void> eval(
   });
 }
 
+/// Wrapper around `package:test`'s `expect(...)`.
+///
+/// Inside [eval], this delegates to the underlying test matcher while also
+/// recording pass/fail counts for the current eval run.
+///
+/// Outside [eval], it behaves like a normal `test.expect(...)`.
 void expect(dynamic actual, dynamic matcher, {String? reason, Object? skip}) {
   if (currentTestRunKey.isEmpty) {
     test.expect(actual, matcher, reason: reason, skip: skip);
@@ -96,11 +145,24 @@ void expect(dynamic actual, dynamic matcher, {String? reason, Object? skip}) {
 /// Evaluates the [matcher] asynchronously against [actual] and records
 /// the result in the eval scoring system.
 ///
+/// Use this for [AsyncLlmMatcher] implementations such as LLM-as-judge and RAG
+/// matchers. Inside [eval], it records both pass/fail counts and numeric scores.
+/// Those scores are later summarized by [AggregateStatistics].
+///
 /// Example:
 /// ```dart
-/// await expectAsync(response, semanticallySimilarTo('expected answer'));
-/// await expectAsync(response, isNotToxic());
-/// await expectAsync(response, answersQuestion('What is 2+2?'));
+/// await expectAsync(
+///   response,
+///   semanticallySimilarTo(
+///     'expected answer',
+///     apiService: apiService,
+///   ),
+/// );
+/// await expectAsync(response, isNotToxic(apiService: apiService));
+/// await expectAsync(
+///   response,
+///   answersQuestion('What is 2+2?', apiService: apiService),
+/// );
 /// ```
 Future<void> expectAsync(
   String actual,

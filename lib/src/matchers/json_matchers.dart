@@ -3,15 +3,36 @@ import 'dart:convert';
 import 'package:matcher/matcher.dart';
 
 /// Matches a string that is valid JSON.
+///
+/// Example:
+/// ```dart
+/// expect('{"status":"ok"}', isValidJson);
+/// expect('[1, 2, 3]', isValidJson);
+/// ```
 const Matcher isValidJson = _IsValidJson();
 
-/// Matches a string that is a valid JSON object (starts with `{`).
+/// Matches a string that decodes to a JSON object.
+///
+/// Example:
+/// ```dart
+/// expect('{"status":"ok"}', isJsonObject);
+/// ```
 const Matcher isJsonObject = _IsJsonObject();
 
-/// Matches a string that is a valid JSON array (starts with `[`).
+/// Matches a string that decodes to a JSON array.
+///
+/// Example:
+/// ```dart
+/// expect('[{"id":1},{"id":2}]', isJsonArray);
+/// ```
 const Matcher isJsonArray = _IsJsonArray();
 
 /// Matches a JSON string that contains the specified [key] at the top level.
+///
+/// Example:
+/// ```dart
+/// expect('{"status":"ok","count":2}', hasJsonKey('status'));
+/// ```
 Matcher hasJsonKey(String key) => _HasJsonKey(key);
 
 /// Matches a JSON string that has a value at the specified [path].

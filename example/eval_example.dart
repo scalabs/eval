@@ -1,22 +1,32 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:eval/eval.dart';
 
 Future<void> main() async {
   final apiKey = Platform.environment['ANTHROPIC_API_KEY'] ?? '';
+  if (apiKey.isEmpty) {
+    throw StateError('Set ANTHROPIC_API_KEY before running this example.');
+  }
+
   await eval(
-    'JSON Generation Test',
+    'answers geography questions',
     (apiService) async {
-      final resp = await apiService.sendRequest(
-        'Give me a json object that returns a key value pair with "message" and "Hello, World!"',
-        systemPrompt:
-            'Your job is to only produce a JSON object. No other description or explanation or anything. And no ```json or ``` blocks. Just the pure JSON object.',
+      final answer = await apiService.sendRequest(
+        'Answer in one short sentence: What is the capital of France?',
       );
-      final json = jsonDecode(resp);
-      print(json);
-      expect(json, isA<Map<String, dynamic>>());
-      expect(json['message'], 'Hello, World!');
+
+      expect(answer, containsIgnoreCase('paris'));
+      expect(answer, sentenceCountBetween(1, 2));
+
+      await expectAsync(
+        answer,
+        answersQuestion(
+          'What is the capital of France?',
+          apiService: apiService,
+        ),
+      );
+
+      await expectAsync(answer, isNotToxic(apiService: apiService));
     },
     apiServices: [
       ExampleClaudeService(
@@ -28,7 +38,7 @@ Future<void> main() async {
         apiKey: apiKey,
       ),
     ],
-    numberOfRunsPerLLM: 3,
+    numberOfRunsPerLLM: 2,
     verbose: true,
   );
 }

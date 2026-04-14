@@ -5,7 +5,11 @@ import 'dart:convert';
 import 'package:eval/src/services/service.dart';
 import 'package:matcher/matcher.dart';
 
-/// Global API service for LLM matchers. Must be set before using LLM matchers.
+/// Global API service for LLM matchers.
+///
+/// Most examples in this package prefer passing `apiService:` explicitly to the
+/// matcher inside `eval(...)`. Use this global when you want one default judge
+/// service for the whole file.
 APICallService? llmMatcherService;
 
 /// Matches a string that is semantically similar to [reference] using
@@ -18,9 +22,13 @@ APICallService? llmMatcherService;
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(
-///   'The capital of France is Paris',
-///   semanticallySimilarTo('Paris is the capital city of France'),
+///   answer,
+///   semanticallySimilarTo(
+///     'Paris is the capital city of France',
+///     apiService: apiService,
+///   ),
 /// );
 /// ```
 AsyncLlmMatcher semanticallySimilarTo(
@@ -36,9 +44,13 @@ AsyncLlmMatcher semanticallySimilarTo(
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(
-///   'Paris',
-///   answersQuestion('What is the capital of France?'),
+///   answer,
+///   answersQuestion(
+///     'What is the capital of France?',
+///     apiService: apiService,
+///   ),
 /// );
 /// ```
 AsyncLlmMatcher answersQuestion(
@@ -54,9 +66,13 @@ AsyncLlmMatcher answersQuestion(
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(
-///   'Paris is in France',
-///   isFaithfulTo('Paris is the capital of France, a country in Europe.'),
+///   answer,
+///   isFaithfulTo(
+///     sourceDocument,
+///     apiService: apiService,
+///   ),
 /// );
 /// ```
 AsyncLlmMatcher isFaithfulTo(
@@ -73,9 +89,10 @@ AsyncLlmMatcher isFaithfulTo(
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(
-///   'Hello, how can I help you today?',
-///   isNotToxic(),
+///   answer,
+///   isNotToxic(apiService: apiService),
 /// );
 /// ```
 AsyncLlmMatcher isNotToxic({
@@ -91,9 +108,10 @@ AsyncLlmMatcher isNotToxic({
 ///
 /// Example:
 /// ```dart
+/// // Inside eval(...):
 /// await expectAsync(
-///   'The engineer fixed the code.',
-///   isNotBiased(),
+///   answer,
+///   isNotBiased(apiService: apiService),
 /// );
 /// ```
 AsyncLlmMatcher isNotBiased({
