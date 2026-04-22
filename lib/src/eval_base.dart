@@ -67,6 +67,7 @@ Future<void> eval(
   required List<APICallService> apiServices,
   required int numberOfRunsPerLLM,
   bool verbose = false,
+  Duration timeout = const Duration(minutes: 10),
 }) async {
   assert(apiServices.isNotEmpty, 'apiServices cannot be empty');
 
@@ -100,7 +101,7 @@ Future<void> eval(
               } finally {
                 currentTestRunKey = '';
               }
-            });
+            }, timeout: test.Timeout(timeout));
           }
         },
       );

@@ -1,3 +1,7 @@
+## 0.0.5
+
+- Increase timeout for evals to 10 minutes, expose timeout attribute
+
 ## 0.0.4
 
 - Fix `parseMarkdownBody` so nested frontmatter collections are mutable. Lists
