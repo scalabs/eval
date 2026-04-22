@@ -1,6 +1,6 @@
 name: eval
 description: Pure Dart LLM evaluation helpers for tests, including judge-based matchers, RAG scoring, and statistics.
-version: 0.0.3
+version: 0.0.4
 
 repository: https://github.com/scalabs/eval
 homepage: https://biralo.studio

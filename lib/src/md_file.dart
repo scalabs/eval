@@ -19,6 +19,26 @@ final _frontmatterPattern = RegExp(
   multiLine: true,
 );
 
+/// Recursively converts immutable [YamlMap]/[YamlList] to mutable Dart
+/// [Map<String, dynamic>] and [List].
+///
+/// [loadYaml] returns immutable YAML types. A shallow `Map.from()` only makes
+/// the top-level map mutable — nested structures (lists, maps) stay immutable
+/// and throw [UnsupportedError] on mutation. This function deep-converts the
+/// entire tree so callers can freely mutate any level.
+dynamic deepConvertYaml(dynamic value) {
+  if (value is Map) {
+    return <String, dynamic>{
+      for (final entry in value.entries)
+        entry.key.toString(): deepConvertYaml(entry.value),
+    };
+  }
+  if (value is List) {
+    return value.map(deepConvertYaml).toList();
+  }
+  return value;
+}
+
 ParsedMarkdownDocument inspectMarkdownBody(String source) {
   if (!source.startsWith('---\n')) {
     return (
@@ -46,9 +66,14 @@ ParsedMarkdownDocument inspectMarkdownBody(String source) {
 
   try {
     final parsedYaml = loadYaml(yamlString);
+    if (parsedYaml != null && parsedYaml is! Map) {
+      throw const FormatException(
+        'Expected YAML frontmatter to parse to a map.',
+      );
+    }
     final frontmatter = parsedYaml == null
         ? <String, dynamic>{}
-        : _normalizeYamlMap(parsedYaml);
+        : deepConvertYaml(parsedYaml) as Map<String, dynamic>;
     final title = frontmatter['title'];
 
     return (
@@ -76,25 +101,4 @@ ParsedMarkdownBody parseMarkdownBody(String body) {
     frontmatter: parsed.frontmatter,
     body: parsed.body,
   );
-}
-
-Map<String, dynamic> _normalizeYamlMap(Object? value) {
-  if (value is! Map) {
-    throw FormatException('Expected YAML frontmatter to parse to a map.');
-  }
-
-  return {
-    for (final entry in value.entries)
-      entry.key.toString(): _normalizeYamlValue(entry.value),
-  };
-}
-
-dynamic _normalizeYamlValue(Object? value) {
-  if (value is YamlMap) {
-    return _normalizeYamlMap(value);
-  }
-  if (value is YamlList) {
-    return value.map(_normalizeYamlValue).toList();
-  }
-  return value;
 }

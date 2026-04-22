@@ -1,3 +1,13 @@
+## 0.0.4
+
+- Fix `parseMarkdownBody` so nested frontmatter collections are mutable. Lists
+  and maps nested inside the parsed frontmatter previously came back as
+  immutable `YamlList`/`YamlMap` instances and threw `UnsupportedError` on
+  assignment.
+- Export `deepConvertYaml`, a recursive helper that converts
+  `YamlMap`/`YamlList` trees to mutable `Map<String, dynamic>` and `List`
+  structures.
+
 ## 0.0.3
 
 - Overhaul the README and public Dartdoc so `eval(...)` is documented as the
