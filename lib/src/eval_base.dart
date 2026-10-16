@@ -69,48 +69,95 @@ Future<void> eval(
   bool verbose = false,
   Duration timeout = const Duration(minutes: 10),
 }) async {
-  assert(apiServices.isNotEmpty, 'apiServices cannot be empty');
+  _registerEval<APICallService>(
+    description,
+    testFunction,
+    services: apiServices,
+    numberOfRuns: numberOfRunsPerLLM,
+    modelName: (service) => service.defaultModel.name,
+    verbose: verbose,
+    timeout: timeout,
+  );
+}
 
+/// Body of a typed decision evaluation.
+typedef DecisionTestFunction =
+    FutureOr<void> Function(DecisionModelService service);
+
+/// Evaluates decision models using the same assertions and statistics as [eval].
+/// Every repetition is scored independently; there is no best-of-run selection.
+Future<void> decisionEval(
+  String description,
+  DecisionTestFunction testFunction, {
+  required List<DecisionModelService> apiServices,
+  required int numberOfRuns,
+  bool verbose = false,
+  Duration timeout = const Duration(minutes: 2),
+}) async {
+  _registerEval<DecisionModelService>(
+    description,
+    testFunction,
+    services: apiServices,
+    numberOfRuns: numberOfRuns,
+    modelName: (service) => service.defaultModel.name,
+    verbose: verbose,
+    timeout: timeout,
+    binaryScores: true,
+  );
+}
+
+void _registerEval<S>(
+  String description,
+  FutureOr<void> Function(S) body, {
+  required List<S> services,
+  required int numberOfRuns,
+  required String Function(S) modelName,
+  required bool verbose,
+  required Duration timeout,
+  bool binaryScores = false,
+}) {
+  if (services.isEmpty) throw ArgumentError('apiServices cannot be empty');
+  if (numberOfRuns < 1) throw ArgumentError('numberOfRuns must be positive');
+  final keys = <String>[];
   test.group(description, () {
-    print(description);
-    for (final apiService in apiServices) {
-      test.group(
-        'with ${apiService.runtimeType} ${apiService.defaultModel.name}',
-        () {
-          print('with ${apiService.runtimeType}');
-          for (var i = 0; i < numberOfRunsPerLLM; i++) {
-            print('run ${i + 1}');
-
-            final testRunKey =
-                '$description with ${apiService.runtimeType} ${apiService.defaultModel.name} ${i + 1}';
-            testRuns[testRunKey] = (0, 0, 0);
-            testScores[testRunKey] = [];
-            test.test('run ${i + 1}', () async {
-              currentTestRunKey = testRunKey;
-              try {
-                await testFunction(apiService);
-              } catch (e) {
-                // Mark any exception as a failed expectation
-                final current = testRuns[testRunKey]!;
-                testRuns[testRunKey] = (
-                  current.$1,
-                  current.$2 + 1,
-                  current.$3 + 1,
-                );
-                rethrow;
-              } finally {
-                currentTestRunKey = '';
+    for (final service in services) {
+      final identity = 'with ${service.runtimeType} ${modelName(service)}';
+      test.group(identity, () {
+        for (var i = 0; i < numberOfRuns; i++) {
+          final key = '$description $identity ${i + 1}';
+          keys.add(key);
+          testRuns[key] = (0, 0, 0);
+          testScores[key] = [];
+          test.test('run ${i + 1}', () async {
+            currentTestRunKey = key;
+            try {
+              await body(service);
+            } catch (_) {
+              final current = testRuns[key]!;
+              // expect/expectAsync already record failed assertions. Only add
+              // a failure for an otherwise unrecorded exception.
+              if (current.$2 == 0) {
+                testRuns[key] = (current.$1, 1, current.$3 + 1);
               }
-            }, timeout: test.Timeout(timeout));
-          }
-        },
-      );
+              if (testScores[key]!.isEmpty) testScores[key]!.add(0);
+              rethrow;
+            } finally {
+              if (binaryScores && testScores[key]!.isEmpty) {
+                final counts = testRuns[key]!;
+                if (counts.$3 > 0) {
+                  testScores[key]!.add(counts.$2 == 0 ? 1 : 0);
+                }
+              }
+              currentTestRunKey = '';
+            }
+          }, timeout: test.Timeout(timeout));
+        }
+      });
     }
-
     test.tearDownAll(() {
       final stats = AggregateStatistics.compute(
-        testRuns: testRuns,
-        testScores: testScores,
+        testRuns: {for (final key in keys) key: testRuns[key]!},
+        testScores: {for (final key in keys) key: testScores[key]!},
       );
       print('\n${stats.format(verbose: verbose)}');
     });
