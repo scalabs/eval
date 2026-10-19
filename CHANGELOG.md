@@ -1,4 +1,4 @@
-## Unreleased
+## 0.0.6
 
 - Add typed decision-model requests and responses for noul, choice, and score,
   with an abstract OpenRouter-compatible service and configurable transport.
