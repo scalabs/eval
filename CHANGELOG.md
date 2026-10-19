@@ -1,3 +1,11 @@
+## Unreleased
+
+- Add typed decision-model requests and responses for noul, choice, and score,
+  with an abstract OpenRouter-compatible service and configurable transport.
+- Add decisionEval with numberOfRuns, sharing the existing evaluation statistics.
+- Support typed queue results and abort timed-out decision requests.
+- Count thrown assertions once and scope printed statistics to their eval group.
+
 ## 0.0.5
 
 - Increase timeout for evals to 10 minutes, expose timeout attribute

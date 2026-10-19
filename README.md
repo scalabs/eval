@@ -497,6 +497,79 @@ await evalCompare(
 );
 ```
 
+## Decision models
+
+Decision models return typed probabilities and choices. They use a separate
+service from chat models; there is no JSON-in-a-chat-string adapter.
+The base implements the [OpenRouter Decisions API](https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-request)
+contract. Provider URLs, credentials, and model enums belong in your subclass:
+
+```dart
+import 'dart:io';
+import 'package:eval/eval.dart';
+
+enum DecisionModel { classifier }
+
+class MyDecisionService extends DecisionModelService<DecisionModel> {
+  MyDecisionService()
+    : super(
+        baseUrl: 'https://openrouter.ai/api/alpha/decisions',
+        apiKey: Platform.environment['OPENROUTER_API_KEY']!,
+        defaultModel: DecisionModel.classifier,
+      );
+
+  @override
+  String modelId(DecisionModel model) => 'your-provider/your-decision-model';
+}
+
+void main() {
+  decisionEval('classifies support tickets', (service) async {
+    final result = await service.decide(DecisionRequest(
+      state: {'ticket': 'Please refund the duplicate charge.'},
+      questions: {
+        'refund': NoulQuestion(instructions: 'Does the ticket request a refund?'),
+        'team': ChoiceQuestion(
+          instructions: 'Which team should handle the ticket?',
+          criteria: {'billing': 'Charges and refunds', 'technical': 'Product defects'},
+        ),
+        'urgency': ScoreQuestion(
+          instructions: 'How urgent is the ticket?',
+          criteria: ['Routine request', 'Time-sensitive issue', 'Service is blocked'],
+        ),
+      },
+    ));
+    final answer = result.answers['refund'] as NoulAnswer;
+    expect(answer.probability, greaterThanOrEqualTo(0.5));
+  }, apiServices: [MyDecisionService()], numberOfRuns: 3);
+}
+```
+
+`decisionEval` uses the same `expect`, `expectAsync`, `EvalStatistics`, and
+aggregate reporting infrastructure as `eval`. All repetitions execute and count;
+it does not select a best response or take a majority vote. Decision runs without
+explicit numeric scores receive a binary score from their assertions. Existing chat APIs
+and `numberOfRunsPerLLM` remain supported.
+
+`DecisionRequest` snapshots text, object, or array state and named questions.
+`NoulAnswer.probability` is the probability of true. `ChoiceAnswer` exposes the
+selected choice; `ScoreAnswer.score` is the expected zero-based rubric level.
+Optional distributions, confidence, and legends remain nullable. Confidence is
+not the same as the winning option's probability. `DecisionResponse` preserves
+the resolved model, provider, request ID, usage, and raw response. Absent cost is
+unknown, never zero.
+
+Malformed JSON, missing question answers, mismatched types, unknown choices,
+and invalid numeric values raise `ApiInvalidDecisionResponseException`. HTTP
+errors use the existing `ApiException` subclasses. There are no hidden retries,
+model fallbacks, chat prompts, or application inclusion thresholds. Decide how
+probabilities and errors affect your application outside the transport.
+
+The constructor accepts `requestTimeout` (60 seconds by default),
+`rateLimitDelay` (zero by default), and an injectable `http.Client` for tests.
+Timeouts signal HTTP request abortion. An injected client is owned by its caller;
+default clients are closed after each request. Compatible self-hosted endpoints
+can use a different full URL and an empty key when authentication is unnecessary.
+
 ## Implementing A Custom API Service
 
 ```dart

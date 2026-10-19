@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+export 'decision_service.dart';
+
 /// Base exception for API call errors.
 abstract class ApiException implements Exception {
   final String message;
@@ -46,8 +48,12 @@ typedef DelayedLLMCallbackRecord = ({Duration delay, LLMCallback callback});
 class APICallQueue {
   final Map<String, Future<void>> queues = {};
 
-  Future<String> addCallByType<E>(
-    LLMCallback callback,
+  Future<String> addCallByType<E>(LLMCallback callback, Duration timeout) =>
+      addTypedCallByType<E, String>(callback, timeout);
+
+  /// Serializes typed requests without making later requests inherit failures.
+  Future<T> addTypedCallByType<E, T>(
+    Future<T> Function() callback,
     Duration timeout,
   ) async {
     final key = E.toString();

@@ -2,6 +2,7 @@
 ///
 /// Import this library to get:
 /// - [eval], which wraps normal Dart tests with multi-model/multi-run execution
+/// - [decisionEval] and [DecisionModelService] for typed decision models
 /// - [expect] and [expectAsync], which record evaluation statistics
 /// - matcher libraries for strings, JSON, schemas, frontmatter, distance, LLM
 ///   judges, and RAG
